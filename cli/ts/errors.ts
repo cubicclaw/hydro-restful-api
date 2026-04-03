@@ -10,7 +10,10 @@ export interface CliError {
 }
 
 export function normalizeError(err: any): CliError {
-  if (err && typeof err === 'object' && err.code && err.message) {
+  // Accept already-normalized CliError objects (but not native Node.js errors
+  // that happen to have 'code' and 'message' properties like ENOTFOUND)
+  const SYSTEM_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN', 'ERR_ASSERTION', 'EMFILE', 'EBADF']);
+  if (err && typeof err === 'object' && err.code && err.message && !SYSTEM_CODES.has(err.code)) {
     return err as CliError;
   }
 
@@ -23,7 +26,11 @@ export function normalizeError(err: any): CliError {
   let code = 'UNKNOWN_ERROR';
   let cleanMessage = msg;
 
-  if (msg.includes('NOT_FOUND')) {
+  // Check error code first (system errors like ENOTFOUND have a .code property)
+  const rawCode = err?.code;
+  if (rawCode === 'ECONNREFUSED' || rawCode === 'ENOTFOUND' || rawCode === 'ETIMEDOUT' || rawCode === 'EAI_AGAIN') {
+    code = 'NETWORK_ERROR';
+  } else if (msg.includes('NOT_FOUND')) {
     code = 'NOT_FOUND';
   } else if (msg.includes('401') || msg.includes('403') || msg.includes('Not logged in')) {
     code = 'UNAUTHORIZED';

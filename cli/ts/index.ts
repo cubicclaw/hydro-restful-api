@@ -10,7 +10,7 @@ import * as http from 'http';
 import FormData from 'form-data';
 import { 
   setOutputMode, setPrettyJson, setQuiet, 
-  renderJson, renderError, printHuman,
+  renderJson, renderError, printHuman, printDiagnostic,
   normalizeProblemList, normalizeProblem,
   normalizeSubmissionList, normalizeSubmission,
   normalizeHomeworkList, normalizeHomework,
@@ -428,9 +428,9 @@ async function listProblems(baseUrl: string, token: string, args: any): Promise<
   const normalized = normalizeProblemList(data);
   if (outputMode === 'json') {
     renderJson(normalized);
-  } else {
-    printHuman(`\nProblems (Total: ${normalized.total})`);
-    printHuman(`Page ${normalized.page}/${normalized.totalPages}\n`);
+  }  else {
+    printDiagnostic(`\nProblems (Total: ${normalized.total})`);
+    printDiagnostic(`Page ${normalized.page}/${normalized.totalPages}\n`);
     for (const p of normalized.items) {
       printHuman(humanProblem(p));
     }
@@ -584,17 +584,24 @@ Help:
 async function main() {
   const rawArgs = process.argv.slice(2);
 
-  // Parse global flags (can appear anywhere, consumed before command dispatch)
-  const GLOBAL_FLAGS = new Set(['--json', '--pretty', '--quiet']);
+  // Parse global flags (--pretty / --quiet anywhere; --json before command).
+  // For write commands (contest-create etc.), pass --json through to the command handler.
+  const PRE_CMD_GLOBAL = new Set(['--pretty', '--quiet']);
+  const WRITE_COMMANDS = new Set(['contest-create', 'homework-create', 'training-create']);
   const args: string[] = [];
-  for (let i = 0; i < rawArgs.length; i++) {
-    if (GLOBAL_FLAGS.has(rawArgs[i])) {
-      if (rawArgs[i] === '--json') setOutputMode('json');
-      else if (rawArgs[i] === '--pretty') setPrettyJson(true);
-      else if (rawArgs[i] === '--quiet') setQuiet(true);
-    } else {
-      args.push(rawArgs[i]);
-    }
+  let firstNonDash = 0;
+  
+  // Phase 1: consume pre-command global flags
+  for (firstNonDash = 0; firstNonDash < rawArgs.length; firstNonDash++) {
+    const a = rawArgs[firstNonDash];
+    if (a === '--json') { setOutputMode('json'); }
+    else if (a === '--pretty') { setPrettyJson(true); }
+    else if (a === '--quiet') { setQuiet(true); }
+    else { break; }  // first non-flag argument = command or sub-command arg
+  }
+  // Phase 2: remaining args go to command dispatch (preserves --json for write commands)
+  for (let j = firstNonDash; j < rawArgs.length; j++) {
+    args.push(rawArgs[j]);
   }
 
   const baseUrl = loadConfig();

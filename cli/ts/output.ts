@@ -30,6 +30,13 @@ export function renderError(err: any) {
 }
 
 export function printHuman(text: string) {
+  if (outputMode === 'human') {
+    process.stdout.write(text + '\n');
+  }
+}
+
+/** Diagnostic / metadata line — suppressed in --quiet mode. */
+export function printDiagnostic(text: string) {
   if (outputMode === 'human' && !quiet) {
     process.stdout.write(text + '\n');
   }
